@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+    <meta charset="UTF-8">
+    <title>Пазителят на Статуите</title>
+    <style>
+        :root { --main-blue: #00f2fe; --deep-blue: #4facfe; --accent-yellow: #ffd319; }
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at center, #1a2a6c, #050510 95%);
+            font-family: 'Segoe UI', cursive, sans-serif;
+            overflow: hidden; display: flex; align-items: center; justify-content: center; color: white;
+        }
+
+        /* МАГИЧЕСКИ НАЧАЛЕН ЕКРАН */
+        #overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(5, 5, 16, 0.96); z-index: 1000;
+            display: flex; justify-content: center; align-items: center;
+            backdrop-filter: blur(10px); transition: 0.5s;
+        }
+        #intro-card {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            padding: 45px; border-radius: 45px; max-width: 750px;
+            border: 3px solid #ffd319; box-shadow: 0 0 60px rgba(255, 211, 25, 0.4);
+            text-align: center;
+        }
+        #intro-card h1 { color: #ffd319; font-size: 2.8em; margin-bottom: 5px; text-shadow: 0 0 20px rgba(255,211,25,0.5); }
+        
+        .mood-box { display: flex; justify-content: space-around; margin: 30px 0; gap: 15px; }
+        .mood { padding: 15px; border-radius: 20px; font-size: 0.95em; width: 33%; border: 2px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); }
+
+        #class-input {
+            width: 80%; padding: 15px; font-size: 20px; border-radius: 15px; border: 2px solid #4facfe;
+            background: rgba(255,255,255,0.1); color: white; text-align: center; margin-bottom: 10px; outline: none;
+        }
+        
+        select {
+            padding: 10px; font-size: 16px; border-radius: 10px; background: rgba(255,255,255,0.2);
+            color: white; border: 2px solid #ffd319; outline: none; margin-bottom: 25px; cursor: pointer;
+        }
+        select option { background: #1e3c72; color: white; }
+
+        #start-btn {
+            background: #4facfe; color: white; padding: 20px 60px; font-size: 24px;
+            border-radius: 60px; border: none; cursor: pointer; font-weight: bold; box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+        }
+
+        /* ПАНЕЛ ЗА ДВИЖЕНИЕ (вдясно) */
+        #sensitivity-control {
+            position: fixed; right: 30px; top: 10%; height: 80%;
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+            background: rgba(0, 0, 0, 0.5); padding: 25px 20px;
+            border-radius: 30px; border: 2px solid rgba(255,255,255,0.2); transition: 0.3s;
+        }
+        #anger-tracker { color: #ff0844; text-align: center; margin-bottom: 20px; font-size: 18px; font-weight: bold; }
+        #anger-display { font-size: 50px; display: block; margin-top: 5px; }
+        #sensitivity-slider { appearance: none; width: 12px; height: 35vh; background: #4facfe; border-radius: 10px; writing-mode: bt-lr; -webkit-appearance: slider-vertical; margin: 15px 0; cursor: pointer; }
+        #sensitivity-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 25px; height: 25px; background: #ffd319; border-radius: 50%; }
+        .slider-label { font-size: 16px; margin-top: 5px; color: #4facfe; font-weight: bold; text-align: center; }
+        #current-vol { font-size: 35px; color: #ff0844; font-weight: bold; }
+
+        /* ГОРЕН БАР */
+        #top-bar { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); width: 90%; display: none; justify-content: space-between; align-items: center; z-index: 100; }
+        #class-display-name { font-size: 55px; font-weight: bold; color: #4facfe; text-shadow: 0 2px 15px rgba(79,172,254,0.6); }
+        #stars-container { font-size: 60px; letter-spacing: 5px; text-shadow: 0 0 20px rgba(255,211,25,0.8); }
+
+        /* ГЕРОЙ И СЦЕНА */
+        #main-stage { display: flex; flex-direction: column; align-items: center; position: relative; }
+        #blob {
+            position: relative; width: 320px; height: 320px;
+            background: linear-gradient(135deg, var(--main-blue), var(--deep-blue));
+            border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
+            box-shadow: 0 0 100px rgba(79, 172, 254, 0.4);
+            animation: morph 8s ease-in-out infinite; transition: all 0.6s ease;
+            display: flex; justify-content: center; align-items: center;
+        }
+        
+        /* ЛИЦЕ И ЕМОЦИИ */
+        .face { margin-top: 40px; display: flex; flex-direction: column; align-items: center; width: 100%; transition: 0.5s; }
+        .eyes { display: flex; gap: 35px; justify-content: center; transition: 0.5s; position: relative; }
+        .eye { width: 42px; height: 50px; background: white; border-radius: 50%; position: relative; animation: blink 6.5s infinite; transition: 0.4s ease; box-shadow: inset 0 -3px 5px rgba(0,0,0,0.1); }
+        .pupil { width: 26px; height: 26px; background: #0f172a; border-radius: 50%; position: absolute; top: 12px; left: 8px; animation: lookAround 11s infinite; transition: 0.4s ease; opacity: 1; }
+        .pupil::after { content: ''; position: absolute; top: 6px; left: 8px; width: 8px; height: 8px; background: white; border-radius: 50%; }
+        .mouth { width: 36px; height: 7px; border-bottom: 6px solid #0f172a; border-radius: 20px; margin-top: 25px; transition: 0.4s; position: relative; }
+
+        /* СЪСТОЯНИЯ ЗА ДВИЖЕНИЕ (СТАТУЯ) */
+        .warning #blob { background: linear-gradient(135deg, #ffd319 0%, #ff901f 100%); box-shadow: 0 0 100px rgba(255, 211, 25, 0.5); }
+        .warning .mouth { width: 20px; height: 4px; border-bottom: 5px solid #0f172a; border-radius: 5px; margin-top: 30px; }
+        .warning .eye { height: 35px; border-radius: 50% 50% 30% 30%; }
+        .warning .pupil { transform: scale(0.85); top: 5px; }
+
+        .danger #blob { background: linear-gradient(135deg, #ff0844 0%, #ffb199 100%); animation: shake 0.2s infinite; box-shadow: 0 0 100px rgba(255, 8, 68, 0.6); }
+        .danger .mouth { border-bottom: none; border-top: 6px solid #0f172a; border-radius: 40px 40px 0 0; margin-top: 25px; width: 28px; height: 15px; }
+        .danger .eye { background: #ffeaa7; height: 45px; border-radius: 20% 80% 50% 50% / 20% 80% 50% 50%; }
+        .danger .eye:first-child { border-radius: 80% 20% 50% 50% / 80% 20% 50% 50%; }
+        .danger .pupil { background: #d63031; transform: scale(0.7); top: 15px; }
+
+        /* ФИЗИОНОМИИ ОТ ЙОГАТА НА СМЕХА */
+        .joy .mouth { width: 90px; height: 45px; border: 6px solid #0f172a; border-radius: 0 0 50px 50px; background: #fb7185; }
+        .tongue .mouth { width: 40px; height: 10px; background: #0f172a; border-radius: 10px; }
+        .tongue .mouth::after { content: ''; position: absolute; top: 5px; left: 10px; width: 20px; height: 30px; background: #fb7185; border-radius: 0 0 12px 12px; border: 3px solid #0f172a; z-index: 1; transform-origin: top center; animation: waggle 0.5s ease-in-out infinite; }
+        .surprised .eye { transform: scale(1.3); }
+        .surprised .mouth { width: 40px; height: 40px; border-radius: 50%; border: 6px solid #0f172a; }
+        .robot .eye { border-radius: 8px; transform: scaleY(0.7); border: 4px solid #0f172a; }
+        .robot .mouth { width: 80px; height: 15px; border: 5px solid #0f172a; border-radius: 0; }
+        .wry .mouth { width: 70px; height: 15px; border: none; border-bottom: 7px solid #0f172a; border-radius: 0 0 40px 5px; transform: rotate(-12deg) translateX(10px); }
+        .scary .mouth { width: 100px; height: 25px; border: none; background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 20"><path d="M0 10 L10 0 L20 10 L30 0 L40 10 L50 0 L60 10 L70 0 L80 10 L90 0 L100 10" fill="none" stroke="%230f172a" stroke-width="10"/></svg>'); }
+        .scary .eye { transform: rotate(15deg); }
+        .scary .eye:first-child { transform: rotate(-15deg); }
+        .wink .eye:last-child { height: 10px; border-radius: 0; background: #0f172a; margin-top: 35px; }
+        .wink .eye:last-child .pupil { opacity: 0; }
+
+        /* ОЧИЛА ЗА ПАУЗА (СЛЪНЧЕВИ) */
+        .paused #blob { background: linear-gradient(135deg, #f6d365 0%, #fda085 100%); }
+        .paused .eyes { gap: 20px; }
+        .paused .eye { 
+            background: #111; 
+            border-radius: 5px 5px 30px 30px; 
+            height: 45px; width: 60px; 
+            border: 4px solid #222;
+            transform: scale(1.1);
+            animation: none;
+            box-shadow: 0 10px 15px rgba(0,0,0,0.3);
+        }
+        .paused .pupil { opacity: 0; }
+        .paused .eye:first-child::after {
+            content: ''; position: absolute;
+            top: 15px; right: -28px;
+            width: 30px; height: 5px;
+            background: #222;
+            z-index: 10;
+        }
+        .paused .mouth { width: 25px; border-bottom: none; border-top: 4px solid #0f172a; border-radius: 20px 20px 0 0; margin-top: 30px; }
+
+
+        #status-msg { margin-top: 40px; font-size: 32px; font-weight: bold; text-align: center; min-height: 90px; text-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+        #countdown-timer { font-size: 80px; font-weight: 900; color: #ffd319; position: absolute; right: -150px; top: 100px; display: none; }
+
+        /* КОНТРОЛЕН ПАНЕЛ ДОЛУ */
+        #bottom-controls { position: fixed; bottom: 35px; display: none; gap: 15px; z-index: 100; }
+        .action-btn { padding: 15px 25px; font-size: 16px; border-radius: 50px; border: none; cursor: pointer; font-weight: bold; box-shadow: 0 10px 20px rgba(0,0,0,0.3); transition: 0.3s; }
+        .action-btn:hover { transform: translateY(-3px) scale(1.05); }
+        #laugh-btn { background: #ff9a9e; color: #5a1e20; border: 2px solid white; }
+        #pause-btn { background: #9b59b6; color: white; }
+        #stop-btn { background: #e74c3c; color: white; }
+
+        /* Екрани (Модали) */
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(5,5,16,0.98); z-index: 2000; display: none; flex-direction: column; justify-content: center; align-items: center; overflow-y: auto; }
+        .stats-box { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); padding: 50px; border-radius: 30px; border: 3px solid #4facfe; text-align: center; width: 80%; max-width: 600px; }
+        .stats-box h2 { color: #ffd319; font-size: 2.5em; margin-top: 0; }
+        .stat-row { display: flex; justify-content: space-between; font-size: 22px; margin: 20px 0; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; }
+        .stat-value { font-weight: bold; color: #4facfe; }
+
+        @keyframes morph { 0%, 100% { border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%; } 50% { border-radius: 60% 40% 50% 60% / 55% 65% 45% 55%; } }
+        @keyframes blink { 0%, 94%, 98%, 100% { transform: scaleY(1); } 96% { transform: scaleY(0.05); } }
+        @keyframes lookAround { 0%, 100% { transform: translate(0, 0); } 30% { transform: translate(-5px, 2px); } 70% { transform: translate(5px, -2px); } }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+        @keyframes waggle { 0%, 100% { transform: rotate(-15deg); } 50% { transform: rotate(15deg); } }
+
+        video, canvas { display: none; }
+    </style>
+</head>
+<body>
+
+    <div id="overlay">
+        <div id="intro-card">
+            <h1>✨ Пазителят на Статуите</h1>
+            <p style="font-size: 1.2em;">Кой може да стои неподвижен най-дълго?</p>
+            
+            <input type="text" id="class-input" placeholder="Име на детето / класа..." autocomplete="off">
+            <br>
+            <select id="star-timer-select">
+                <option value="30">Награда (Звезда) на всеки 30 секунди</option>
+                <option value="60" selected>Награда (Звезда) на всяка 1 минута</option>
+                <option value="120">Награда (Звезда) на всеки 2 минути</option>
+                <option value="300">Награда (Звезда) на всеки 5 минути</option>
+            </select>
+
+            <div class="mood-box">
+                <div class="mood" style="border-color: #4facfe;">
+                    <strong style="color: #4facfe;">СИН</strong><br>Тялото е спокойно. Печелим звезди!
+                </div>
+                <div class="mood" style="border-color: #ffd319;">
+                    <strong style="color: #ffd319;">ЖЪЛТ</strong><br>Внимание! Усещам леко мърдане!
+                </div>
+                <div class="mood" style="border-color: #ff0844;">
+                    <strong style="color: #ff0844;">ЧЕРВЕН</strong><br>Твърде много движение! Магията се разваля.
+                </div>
+            </div>
+            
+            <button id="start-btn" onclick="initApp()">СЪБУДИ ПАЗИТЕЛЯ</button>
+        </div>
+    </div>
+
+    <div id="top-bar">
+        <div id="class-display-name"></div>
+        <div id="stars-container"></div>
+    </div>
+
+    <div id="sensitivity-control">
+        <div id="anger-tracker">😡 ГНЯВ <span id="anger-display">0</span></div>
+        <span class="slider-label">ГРАНИЦА НА<br>ДВИЖЕНИЕ</span>
+        <input type="range" id="sensitivity-slider" min="2" max="50" value="15">
+        <span class="slider-label" id="threshold-val" style="font-size: 35px;">15</span>
+        <span id="current-vol">0</span>
+    </div>
+
+    <div id="main-stage">
+        <div id="blob">
+            <div class="face">
+                <div class="eyes">
+                    <div class="eye"><div class="pupil"></div></div>
+                    <div class="eye"><div class="pupil"></div></div>
+                </div>
+                <div class="mouth"></div>
+            </div>
+            <div id="countdown-timer">7</div>
+        </div>
+        <div id="status-msg">Пазителят очаква вашето спокойствие...</div>
+    </div>
+
+    <div id="bottom-controls">
+        <button id="laugh-btn" class="action-btn">😂 ЙОГА НА СМЕХА</button>
+        <button id="pause-btn" class="action-btn">⏸️ ПАУЗА</button>
+        <button id="stop-btn" class="action-btn">⏹️ КРАЙ НА ИГРАТА</button>
+    </div>
+
+    <div id="stats-modal" class="modal">
+        <div class="stats-box">
+            <h2>🏆 Отчет на Пазителя</h2>
+            <div class="stat-row">Име: <span class="stat-value" id="stat-class"></span></div>
+            <div class="stat-row">Спечелени звезди: <span class="stat-value" id="stat-stars"></span></div>
+            <div class="stat-row">Време като статуя: <span class="stat-value" id="stat-silence"></span></div>
+            <div class="stat-row">Разгневявания (Мърдане): <span class="stat-value" id="stat-anger"></span></div>
+            <div style="margin-top: 30px; font-size: 35px; font-weight: bold; color: #ffd319;" id="stat-msg"></div>
+            <br><br>
+            <button class="action-btn" style="background: #4facfe; color: white;" onclick="location.reload()">НОВА ИГРА</button>
+        </div>
+    </div>
+
+    <video id="webcam" autoplay playsinline></video>
+    <canvas id="motion-canvas" width="64" height="48"></canvas>
+
+<script>
+    // 1. АУДИО ФАЙЛОВЕ
+    const sndHello = new Audio('hello_statue.mp3');
+    const sndWarning = new Audio('warning.mp3');
+    const sndOuch = new Audio('ouch_move.mp3');
+    const sndEndGood = new Audio('end_statue_good.mp3');
+    const sndEndOk = new Audio('end_statue_ok.mp3');
+    const sndEndBad = new Audio('end_statue_bad.mp3');
+
+    const allSounds = [sndHello, sndWarning, sndOuch, sndEndGood, sndEndOk, sndEndBad];
+
+    function playVoice(audioFile) {
+        // НОВО: Спираме всички звуци, които може би звучат в момента, за да няма застъпване!
+        allSounds.forEach(snd => {
+            if(snd !== audioFile) {
+                snd.pause();
+                snd.currentTime = 0;
+            }
+        });
+
+        // Пускаме искания звук от самото му начало
+        audioFile.currentTime = 0;
+        audioFile.play().catch(e => console.log("Audio playback blocked:", e));
+    }
+
+    // 2. ГЛОБАЛНИ ПРОМЕНЛИВИ
+    let sensitivityThreshold = 15; 
+    let motionScore = 0;
+    let isLaughMode = false;
+    let isPaused = false, isSessionActive = false;
+    let angerCount = 0, wasAngry = false, wasWarning = false;
+    let silenceSeconds = 0, noiseSeconds = 0, continuousSilenceSeconds = 0;
+    let SECONDS_FOR_STAR = 60; 
+    let earnedStars = 0;
+    let currentClassName = "";
+    
+    // Елементи
+    const blob = document.getElementById('blob');
+    const stage = document.getElementById('main-stage');
+    const msg = document.getElementById('status-msg');
+    const laughBtn = document.getElementById('laugh-btn');
+    const pauseBtn = document.getElementById('pause-btn');
+    const stopBtn = document.getElementById('stop-btn');
+    const bottomControls = document.getElementById('bottom-controls');
+    const topBar = document.getElementById('top-bar');
+    const starsContainer = document.getElementById('stars-container');
+    const angerDisplay = document.getElementById('anger-display');
+    const cdTimer = document.getElementById('countdown-timer');
+
+    // Камера
+    const video = document.getElementById('webcam');
+    const canvas = document.getElementById('motion-canvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    let previousImageData = null;
+
+    
+    // 3. ИНИЦИАЛИЗАЦИЯ
+    async function initApp() {
+        // 1. Отключваме безшумно всички звуци при клика
+        allSounds.forEach(snd => {
+            snd.volume = 0; 
+            let playPromise = snd.play();
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    snd.pause();
+                    snd.currentTime = 0;
+                    snd.volume = 1; // Връщаме силата на звука за после
+                }).catch(error => console.log("Unlock skipped"));
+            }
+        });
+
+        // 2. Взимаме настройките от екрана
+        SECONDS_FOR_STAR = parseInt(document.getElementById('star-timer-select').value);
+        currentClassName = document.getElementById('class-input').value.trim() || "Тайният Клас";
+        document.getElementById('class-display-name').textContent = currentClassName;
+
+        // 3. Скриваме началния екран
+        document.getElementById('overlay').style.opacity = '0';
+        setTimeout(() => document.getElementById('overlay').style.display = 'none', 500);
+        
+        bottomControls.style.display = 'flex';
+        topBar.style.display = 'flex';
+        document.getElementById('sensitivity-control').style.display = 'flex';
+
+        // 4. Пускаме камерата
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            video.srcObject = stream;
+            
+            video.onloadedmetadata = () => {
+                video.play();
+                isSessionActive = true;
+                startTimers();
+                detectMotionLoop(); 
+                
+                // ВАЖНО: Пускаме началния поздрав ТУК! 
+                // Изчакваме половин секунда след старта на камерата, за да сме сигурни, че всичко е заредено.
+                setTimeout(() => {
+                    playVoice(sndHello);
+                }, 500);
+            };
+        } catch(e) { 
+            alert("Моля, разрешете достъп до камерата!"); 
+        }
+    }
+    // 4. СЛЕДЕНЕ ЗА ДВИЖЕНИЕ
+    function detectMotionLoop() {
+        if (!isSessionActive) return;
+
+        if (!isLaughMode && !isPaused) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            let currentMotionPercent = 0;
+
+            if (previousImageData) {
+                let changedPixels = 0;
+                const totalPixels = currentImageData.data.length / 4;
+                for (let i = 0; i < currentImageData.data.length; i += 4) {
+                    const rDiff = Math.abs(currentImageData.data[i] - previousImageData.data[i]);
+                    const gDiff = Math.abs(currentImageData.data[i+1] - previousImageData.data[i+1]);
+                    const bDiff = Math.abs(currentImageData.data[i+2] - previousImageData.data[i+2]);
+                    if (rDiff + gDiff + bDiff > 80) changedPixels++;
+                }
+                currentMotionPercent = (changedPixels / totalPixels) * 100;
+            }
+            previousImageData = currentImageData;
+
+            let vol = currentMotionPercent;
+            document.getElementById('current-vol').textContent = Math.round(vol);
+
+            if (vol > sensitivityThreshold) {
+                motionScore += (vol - sensitivityThreshold) * 0.4;
+            } else if (motionScore > 0) {
+                motionScore -= 0.8;
+            }
+
+            if (motionScore > 100) { 
+                stage.className = 'danger';
+                msg.textContent = "РАЗВАЛИ МАГИЯТА! ";
+                wasWarning = false;
+                if (!wasAngry) { 
+                    angerCount++; wasAngry = true; angerDisplay.textContent = angerCount;
+                    playVoice(sndOuch); 
+                }
+            } else if (motionScore > 40) {
+                stage.className = 'warning';
+                msg.textContent = "Внимавай, усещам движение... Замръзни!";
+                wasAngry = false;
+                if (!wasWarning) {
+                    wasWarning = true;
+                    playVoice(sndWarning); 
+                }
+            } else {
+                stage.className = '';
+                
+                // Сменяме текста САМО ако звуците са приключили
+                if (sndWarning.paused && sndOuch.paused && sndHello.paused) {
+                    msg.textContent = "Прекрасна статуя...";
+                }
+                
+                wasAngry = false;
+                wasWarning = false;
+            }
+        }
+        setTimeout(() => requestAnimationFrame(detectMotionLoop), 80);
+    }
+
+    // 5. ТАЙМЕРИ ЗА ЗВЕЗДИ
+    function startTimers() {
+        setInterval(() => {
+            if (!isSessionActive || isPaused || isLaughMode) return;
+            if (stage.className === 'danger' || stage.className === 'warning') {
+                noiseSeconds++;
+                continuousSilenceSeconds = 0; 
+            } else {
+                silenceSeconds++;
+                continuousSilenceSeconds++;
+                if (continuousSilenceSeconds >= SECONDS_FOR_STAR) {
+                    earnedStars++;
+                    starsContainer.innerHTML += "⭐";
+                    continuousSilenceSeconds = 0;
+                }
+            }
+        }, 1000);
+    }
+
+    // 6. ЙОГА НА СМЕХА
+    const laughFaces = [
+        {c:'joy', t:"УСМИВКА ДО УШИТЕ! 😁"},
+        {c:'tongue', t:"ПОКАЖИ ЕЗИК! ПЛЕЗЕНЕ! 😛"},
+        {c:'surprised', t:"УАУ! ГОЛЯМА ИЗНЕНАДА! 😲"},
+        {c:'robot', t:"ЛИЦЕ НА РОБОТ - БИП-БОП! 🤖"},
+        {c:'wry', t:"КРИВА УСМИВКА... ХИТРЕЦ! 😏"},
+        {c:'scary', t:"СТРАШНА ФИЗИОНОМИЯ! ГРРР! 👹"},
+        {c:'wink', t:"НАМИГНИ ХИТРО! 😉"}
+    ];
+    let laughDeck = [];
+    let laughInterval;
+
+    laughBtn.onclick = function() {
+        if (isPaused) return;
+        if (!isLaughMode) {
+            isLaughMode = true;
+            motionScore = 0;
+            stage.className = '';
+            laughBtn.textContent = "🛑 СТОП СМЯХ";
+            cdTimer.style.display = "block";
+            runLaughCycle();
+        } else {
+            stopLaughCycle();
+        }
+    };
+
+    function runLaughCycle() {
+        if (!isLaughMode) return;
+        
+        if (laughDeck.length === 0) {
+            laughDeck = [...laughFaces].sort(() => Math.random() - 0.5);
+        }
+        const currentFace = laughDeck.pop();
+        
+        blob.className = currentFace.c;
+        msg.textContent = currentFace.t;
+        
+        let timeLeft = 7;
+        cdTimer.textContent = timeLeft;
+        
+        laughInterval = setInterval(() => {
+            timeLeft--;
+            cdTimer.textContent = timeLeft;
+            if(timeLeft <= 0) {
+                clearInterval(laughInterval);
+                runLaughCycle();
+            }
+        }, 1000);
+    }
+
+    function stopLaughCycle() {
+        clearInterval(laughInterval);
+        isLaughMode = false;
+        blob.className = '';
+        laughBtn.textContent = "😂 ЙОГА НА СМЕХА";
+        cdTimer.style.display = "none";
+        msg.textContent = "Готови ли сме отново за статуи?";
+    }
+
+    // 7. КОНТРОЛИ
+    document.getElementById('sensitivity-slider').oninput = function() {
+        sensitivityThreshold = parseInt(this.value);
+        document.getElementById('threshold-val').textContent = sensitivityThreshold;
+    }
+
+    pauseBtn.onclick = function() {
+        if (isLaughMode) return;
+        isPaused = !isPaused;
+        if (isPaused) {
+            stage.className = 'paused';
+            msg.textContent = "Почивка в стил... Холивуд! 😎";
+            pauseBtn.textContent = "▶️ ПУСНИ";
+        } else {
+            stage.className = '';
+            msg.textContent = "Пазителят отново гледа...";
+            pauseBtn.textContent = "⏸️ ПАУЗА";
+            motionScore = 0; 
+        }
+    };
+
+    stopBtn.onclick = function() {
+        isSessionActive = false; 
+        if(isLaughMode) stopLaughCycle();
+        
+        const stream = video.srcObject;
+        if (stream) stream.getTracks().forEach(track => track.stop());
+        
+        document.getElementById('main-stage').style.display = 'none';
+        bottomControls.style.display = 'none';
+        topBar.style.display = 'none';
+        document.getElementById('sensitivity-control').style.display = 'none';
+        
+        document.getElementById('stat-class').textContent = currentClassName;
+        document.getElementById('stat-stars').textContent = earnedStars > 0 ? "⭐".repeat(earnedStars) : "Няма";
+        const mS = Math.floor(silenceSeconds / 60); const sS = silenceSeconds % 60;
+        document.getElementById('stat-silence').textContent = `${mS} мин. и ${sS} сек.`;
+        document.getElementById('stat-anger').textContent = angerCount;
+        
+        let msgEl = document.getElementById('stat-msg');
+        let totalTime = silenceSeconds + noiseSeconds;
+        let silencePercentage = totalTime > 0 ? (silenceSeconds / totalTime) * 100 : 0;
+
+        if (angerCount <= 3 && silencePercentage >= 70) {
+            msgEl.textContent = "ТИ БЕШЕ НЕВЕРОЯТЕН! ТЯЛОТО ТИ БЕШЕ ТОЛКОВА СПОКОЙНО!";
+            playVoice(sndEndGood);
+        } else if (angerCount <= 6) {
+            msgEl.textContent = "СПРАВИ СЕ ДОБРЕ, НО НА МОМЕНТИ ТИ БЕШЕ ТРУДНО, НАЛИ?";
+            playVoice(sndEndOk);
+        } else {
+            msgEl.textContent = "ДНЕС ТЯЛОТО ТИ ИСКАШЕ ДА ТАНЦУВА! ";
+            playVoice(sndEndBad);
+        }
+
+        document.getElementById('stats-modal').style.display = 'flex';
+    };
+</script>
+</body>
+</html>
